@@ -60,7 +60,9 @@ def create_kafka_producer():
     # https://www.confluent.io/blog/introduction-to-apache-kafka-for-python-programmers/
     from confluent_kafka import Producer
 
-    p = Producer({'bootstrap.servers': 'localhost:9092'})
+    p = Producer({'bootstrap.servers': 'localhost:9092',
+                  'acks': 'all',
+                  'enable.idempotence': True})
     return p
 
 
