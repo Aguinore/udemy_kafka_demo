@@ -1,6 +1,8 @@
 import sys
+import json
 
 from confluent_kafka.cimpl import KafkaError
+from elasticsearch import Elasticsearch
 
 from configs import Configs
 
@@ -33,6 +35,9 @@ def create_kafka_consumer(topic):
 
 configs = Configs()
 consumer = None
+
+es = Elasticsearch(hosts=configs.elastic)
+
 try:
     consumer = create_kafka_consumer(configs.kafka_topic)
     while True:
@@ -40,7 +45,10 @@ try:
         if msg is None:
             continue
         elif not msg.error():
-            print('Received message: {0}'.format(msg.value()))
+            tweet = msg.value()
+            id = json.loads(tweet).get('id')
+            es.index(index='twitter', doc_type='tweet', id=id, body=tweet)
+            print('Received message: {0}'.format(tweet))
         elif msg.error().code() == KafkaError._PARTITION_EOF:
             print('End of partition reached {0}/{1}'.format(msg.topic(), msg.partition()))
         else:

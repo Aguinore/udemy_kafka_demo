@@ -1,17 +1,6 @@
 from tweepy import StreamListener, OAuthHandler, Stream
-from yaml_config_parser import ConfigParser
 from configs import Configs
 import sys
-
-
-class Secrets:
-    def __init__(self):
-        self.config = 'resources/secret.yaml'
-        yaml = ConfigParser(self.config)
-        self.consumer_key = yaml.get_config('consumer_key')
-        self.consumer_secret = yaml.get_config('consumer_secret')
-        self.access_token_key = yaml.get_config('access_token_key')
-        self.access_token_secret = yaml.get_config('access_token_secret')
 
 
 class StdOutListener(StreamListener):
@@ -39,11 +28,10 @@ def exit_gracefully(kafka_producer):
     sys.exit(0)
 
 
-def create_twitter_client(kafka_producer, topic):
-    listener = StdOutListener(kafka_producer, topic)
-    secrets = Secrets()
-    auth = OAuthHandler(secrets.consumer_key, secrets.consumer_secret)
-    auth.set_access_token(secrets.access_token_key, secrets.access_token_secret)
+def create_twitter_client(kafka_producer, configs):
+    listener = StdOutListener(kafka_producer, configs.kafka_topic)
+    auth = OAuthHandler(configs.consumer_key, configs.consumer_secret)
+    auth.set_access_token(configs.access_token_key, configs.access_token_secret)
 
     return Stream(auth, listener)
 
@@ -54,7 +42,8 @@ def create_kafka_producer():
 
     p = Producer({'bootstrap.servers': 'localhost:9092',
                   'acks': 'all',
-                  'enable.idempotence': True})
+                  'enable.idempotence': 'true',
+                  'compression.type': 'snappy'})
     return p
 
 
@@ -62,7 +51,7 @@ configs = Configs()
 producer = None
 try:
     producer = create_kafka_producer()
-    client = create_twitter_client(producer, configs.kafka_topic)
+    client = create_twitter_client(producer, configs)
 
     client.filter(track=configs.twitter_topics)
 
