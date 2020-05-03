@@ -1,6 +1,6 @@
 from tweepy import StreamListener, OAuthHandler, Stream
 from yaml_config_parser import ConfigParser
-import signal
+from configs import Configs
 import sys
 
 
@@ -16,14 +16,15 @@ class Secrets:
 
 class StdOutListener(StreamListener):
 
-    def __init__(self, kafka_producer):
+    def __init__(self, kafka_producer, topic):
         super().__init__()
         self.kafka_producer = kafka_producer
+        self.topic = topic
 
     """ A listener handles tweets that are received from the stream.
     """
     def on_data(self, data):
-        self.kafka_producer.produce(topic='twitter_kafka', value=data)
+        self.kafka_producer.produce(topic=self.topic, value=data)
         print(data)
         return True
 
@@ -38,22 +39,13 @@ def exit_gracefully(kafka_producer):
     sys.exit(0)
 
 
-def create_twitter_client(kafka_producer):
-    listener = StdOutListener(kafka_producer)
+def create_twitter_client(kafka_producer, topic):
+    listener = StdOutListener(kafka_producer, topic)
     secrets = Secrets()
     auth = OAuthHandler(secrets.consumer_key, secrets.consumer_secret)
     auth.set_access_token(secrets.access_token_key, secrets.access_token_secret)
 
-    stream = Stream(auth, listener)
-    stream.filter(track=['python', 'gvido'])
-
-    def signal_handler():
-        print('You pressed Ctrl+C!')
-        exit_gracefully(kafka_producer)
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGKILL, signal_handler)
-    return stream
+    return Stream(auth, listener)
 
 
 def create_kafka_producer():
@@ -66,9 +58,13 @@ def create_kafka_producer():
     return p
 
 
+configs = Configs()
 producer = None
 try:
     producer = create_kafka_producer()
-    create_twitter_client(producer)
+    client = create_twitter_client(producer, configs.kafka_topic)
+
+    client.filter(track=configs.twitter_topics)
+
 finally:
     exit_gracefully(producer)

@@ -1,0 +1,4 @@
+kafka_topic: twitter_kafka
+twitter_topics:
+  - python
+  - gvido
